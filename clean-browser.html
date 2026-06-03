@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CleanView Browser</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #00e5ff;
+    --accent2: #ff4d6d;
+    --accent3: #7fff6e;
+    --text: #e8e8f0;
+    --text-dim: #6b6b80;
+    --radius: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #logo {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #logo span { color: var(--text-dim); font-weight: 400; font-size: 11px; }
+
+  #url-form {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  #url-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #url-input:focus { border-color: var(--accent); }
+  #url-input::placeholder { color: var(--text-dim); }
+
+  .btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #000; }
+  .btn.primary:hover { opacity: 0.85; color: #000; }
+  .btn.danger { border-color: var(--accent2); color: var(--accent2); }
+  .btn.danger:hover { background: var(--accent2); color: #fff; }
+  .btn.active { border-color: var(--accent3); color: var(--accent3); background: rgba(127,255,110,0.08); }
+
+  #stats-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 5px 14px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+  }
+  .stat { display: flex; align-items: center; gap: 4px; }
+  .stat-val { color: var(--accent3); font-weight: 700; }
+  .stat-val.red { color: var(--accent2); }
+
+  /* ── MAIN AREA ── */
+  #main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── IFRAME WRAPPER ── */
+  #frame-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  #page-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  /* ── PICKER OVERLAY ── */
+  #picker-overlay {
+    position: absolute;
+    inset: 0;
+    cursor: crosshair;
+    z-index: 999;
+    display: none;
+  }
+  #picker-overlay.active { display: block; }
+  #picker-highlight {
+    position: absolute;
+    border: 2px solid var(--accent2);
+    background: rgba(255,77,109,0.18);
+    pointer-events: none;
+    display: none;
+    border-radius: 3px;
+    transition: all 0.05s;
+  }
+  #picker-label {
+    position: absolute;
+    background: var(--accent2);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    pointer-events: none;
+    display: none;
+    top: -22px;
+    left: 0;
+    white-space: nowrap;
+  }
+
+  /* ── SIDE PANEL ── */
+  #side-panel {
+    width: 280px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.25s;
+    flex-shrink: 0;
+  }
+  #side-panel.collapsed { width: 0; border: none; }
+
+  #panel-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  #panel-header span { color: var(--accent); }
+
+  #hidden-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  #hidden-list::-webkit-scrollbar { width: 4px; }
+  #hidden-list::-webkit-scrollbar-track { background: transparent; }
+  #hidden-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .hidden-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .hidden-item .tag { color: var(--accent2); font-weight: 700; }
+  .hidden-item .restore-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-size: 9px;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+  }
+  .hidden-item .restore-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  #empty-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 11px;
+    text-align: center;
+    padding: 20px;
+    gap: 8px;
+  }
+  #empty-panel .icon { font-size: 28px; }
+
+  .clear-all-btn {
+    margin: 8px;
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-size: 10px;
+    padding: 7px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'JetBrains Mono', monospace;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .clear-all-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  /* ── LOADING / EMPTY STATE ── */
+  #empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--text-dim);
+    gap: 16px;
+    font-size: 13px;
+    text-align: center;
+    padding: 30px;
+  }
+  #empty-state h2 { color: var(--text); font-size: 22px; font-weight: 800; }
+  #empty-state .hint {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    max-width: 360px;
+    line-height: 1.7;
+    color: var(--text-dim);
+  }
+  #empty-state .hint strong { color: var(--accent); }
+
+  #loading-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    width: 0%;
+    transition: width 0.3s;
+    z-index: 1000;
+    display: none;
+  }
+
+  /* ── PROXY NOTE ── */
+  #proxy-note {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    max-width: 440px;
+    text-align: center;
+    line-height: 1.6;
+    display: none;
+    z-index: 500;
+  }
+  #proxy-note strong { color: var(--accent); }
+  #proxy-note a { color: var(--accent3); text-decoration: none; }
+  #proxy-note .close-note {
+    display: block;
+    margin-top: 6px;
+    cursor: pointer;
+    color: var(--accent2);
+    font-size: 10px;
+  }
+
+  /* ── TOOLTIPS ── */
+  [data-tip] { position: relative; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a28;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--accent3);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent3);
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.25s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── CSS EDITOR ── */
+  #css-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 280px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 14px;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 100;
+  }
+  #css-panel.open { display: flex; }
+  #css-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  #css-editor {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 8px;
+    height: 90px;
+    resize: none;
+    outline: none;
+    width: 100%;
+    line-height: 1.5;
+  }
+  #css-editor::placeholder { color: var(--text-dim); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div id="logo">
+    ◈ CleanView <span>ad-free browser</span>
+  </div>
+
+  <div id="url-form">
+    <input id="url-input" type="text" placeholder="https://example.com  —  paste any URL and press Enter" />
+    <button class="btn primary" onclick="loadPage()" data-tip="Load page">
+      ▶ Go
+    </button>
+  </div>
+
+  <button class="btn" id="picker-btn" onclick="togglePicker()" data-tip="Pick & hide element">
+    ✂ Pick
+  </button>
+  <button class="btn" id="css-btn" onclick="toggleCssPanel()" data-tip="Custom CSS injection">
+    { } CSS
+  </button>
+  <button class="btn" id="panel-btn" onclick="togglePanel()" data-tip="Hidden elements panel">
+    ☰ Panel
+  </button>
+</div>
+
+<!-- STATS BAR -->
+<div id="stats-bar">
+  <div class="stat">Ads blocked: <span class="stat-val" id="stat-ads">0</span></div>
+  <div class="stat">Scripts blocked: <span class="stat-val" id="stat-scripts">0</span></div>
+  <div class="stat">Elements hidden: <span class="stat-val red" id="stat-hidden">0</span></div>
+  <div class="stat" style="margin-left:auto; color: var(--text-dim)">
+    ⚠ Uses allorigins.win proxy — works for most public pages
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- FRAME WRAP -->
+  <div id="frame-wrap">
+    <div id="loading-bar"></div>
+
+    <!-- EMPTY STATE -->
+    <div id="empty-state">
+      <div style="font-size:42px">◈</div>
+      <h2>CleanView Browser</h2>
+      <p>Browse any page — ads stripped, clutter removed.</p>
+      <div class="hint">
+        <strong>How to use:</strong><br>
+        1. Paste a URL above and press <strong>Go</strong><br>
+        2. Ads & trackers are auto-removed<br>
+        3. Use <strong>✂ Pick</strong> to click any element to hide it<br>
+        4. Use <strong>{ } CSS</strong> to inject custom styles<br>
+        5. View hidden elements in <strong>☰ Panel</strong>
+      </div>
+    </div>
+
+    <!-- iframe for loaded page -->
+    <iframe id="page-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" style="display:none"></iframe>
+
+    <!-- picker overlay (sits on top of iframe area) -->
+    <div id="picker-overlay" onclick="pickerClick(event)" onmousemove="pickerMove(event)">
+      <div id="picker-highlight">
+        <div id="picker-label"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDE PANEL -->
+  <div id="side-panel">
+    <div id="panel-header">
+      Hidden Elements <span id="panel-count">0</span>
+    </div>
+    <div id="hidden-list">
+      <div id="empty-panel">
+        <div class="icon">⬜</div>
+        <div>No elements hidden yet.</div>
+        <div style="font-size:10px; font-family:'JetBrains Mono',monospace">Use ✂ Pick to select elements</div>
+      </div>
+    </div>
+    <button class="clear-all-btn" onclick="restoreAll()">↺ Restore all hidden elements</button>
+  </div>
+
+</div>
+
+<!-- CSS PANEL -->
+<div id="css-panel">
+  <div id="css-panel-header">
+    <span>⌨ Inject Custom CSS</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="padding:3px 10px;font-size:10px" onclick="applyCSS()">Apply</button>
+      <button class="btn danger" style="padding:3px 10px;font-size:10px" onclick="toggleCssPanel()">Close</button>
+    </div>
+  </div>
+  <textarea id="css-editor" placeholder="/* write any CSS to hide or style elements */
+.ad-banner { display: none !important; }
+#cookie-notice { display: none !important; }"></textarea>
+</div>
+
+<!-- PROXY NOTE -->
+<div id="proxy-note">
+  <strong>Note:</strong> Pages are fetched via the <a href="https://allorigins.win" target="_blank">allorigins.win</a> proxy to bypass CORS. Some heavy JS-based pages may not render fully. For full browsing, consider using a local CORS proxy or browser extension instead.
+  <span class="close-note" onclick="document.getElementById('proxy-note').style.display='none'">✕ dismiss</span>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ── STATE ──
+let hiddenElements = [];   // [{selector, tag, id, classes, label}]
+let pickerMode = false;
+let currentHTML = '';
+let adsBlockedCount = 0;
+let scriptsBlockedCount = 0;
+let injectedCSS = '';
+
+// ── AD BLOCK RULES ──
+// These selectors are stripped from the fetched HTML before rendering
+const AD_SELECTORS = [
+  // General ad containers
+  '[id*="ad-"],[id*="-ad"],[id*="ads"],[id*="advert"],[id*="advertisement"],[id*="adsense"]',
+  '[class*="ad-"],[class*="-ad"],[class*="ads-"],[class*="advert"],[class*="advertisement"],[class*="adsense"]',
+  '[class*="banner-ad"],[class*="ad-banner"],[class*="display-ad"]',
+  // Known ad networks
+  'ins.adsbygoogle',
+  '[id^="google_ads"],[id^="div-gpt-ad"]',
+  'iframe[src*="doubleclick"]','iframe[src*="googlesyndication"]',
+  'iframe[src*="amazon-adsystem"]','iframe[src*="adnxs.com"]',
+  // Popups / overlays
+  '[class*="popup"],[class*="pop-up"],[class*="interstitial"]',
+  '[class*="overlay"][class*="ad"]',
+  // Cookie banners
+  '[id*="cookie"],[class*="cookie-banner"],[class*="cookie-notice"],[class*="gdpr"]',
+  '[id*="consent"],[class*="consent-banner"],[class*="consent-notice"]',
+  // Newsletter nags
+  '[class*="newsletter-popup"],[class*="email-gate"],[class*="subscribe-modal"]',
+  // Social follow bars
+  '[class*="social-bar"],[class*="follow-us"],[class*="share-bar"]',
+  // Sticky floating things
+  '[class*="sticky-ad"],[class*="floating-ad"],[class*="fixed-ad"]',
+  // Outbrain / Taboola
+  '[class*="taboola"],[class*="outbrain"]',
+  'div[id*="taboola"]','div[id*="outbrain"]',
+];
+
+// Script domains to block (stripped from HTML)
+const BLOCKED_SCRIPT_DOMAINS = [
+  'googlesyndication','doubleclick','googletagmanager','googletagservices',
+  'amazon-adsystem','adnxs','adroll','criteo','outbrain','taboola',
+  'disqusads','zergnet','sharethrough','pubmatic','openx','rubiconproject',
+  'sovrn','lijit','quantserve','scorecardresearch','chartbeat',
+  'hotjar','mouseflow','crazyegg','fullstory','logrocket',
+  'optimizely','visual website optimizer','freshmarketer',
+  'popads','popcash','propellerads','bidvertiser',
+];
+
+// ── UTILS ──
+function toast(msg, duration = 2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function setStats(ads, scripts, hidden) {
+  document.getElementById('stat-ads').textContent = ads;
+  document.getElementById('stat-scripts').textContent = scripts;
+  document.getElementById('stat-hidden').textContent = hidden;
+}
+
+// ── LOAD PAGE ──
+async function loadPage() {
+  let url = document.getElementById('url-input').value.trim();
+  if (!url) return;
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  // Show loading
+  const bar = document.getElementById('loading-bar');
+  bar.style.display = 'block';
+  bar.style.width = '0%';
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('page-iframe').style.display = 'none';
+  adsBlockedCount = 0; scriptsBlockedCount = 0;
+  setStats(0, 0, hiddenElements.length);
+
+  setTimeout(() => bar.style.width = '40%', 100);
+
+  try {
+    // Fetch via CORS proxy
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const resp = await fetch(proxyUrl);
+    if (!resp.ok) throw new Error('Proxy request failed');
+    const data = await resp.json();
+    let html = data.contents;
+    if (!html) throw new Error('Empty response');
+
+    bar.style.width = '65%';
+
+    // Clean HTML
+    html = cleanHTML(html, url);
+
+    bar.style.width = '85%';
+
+    // Render in iframe
+    const iframe = document.getElementById('page-iframe');
+    iframe.style.display = 'block';
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    // Re-apply hidden elements & custom CSS after render
+    setTimeout(() => {
+      reapplyHidden(doc);
+      if (injectedCSS) injectCSSIntoDoc(doc, injectedCSS);
+    }, 600);
+
+    bar.style.width = '100%';
+    setTimeout(() => { bar.style.display = 'none'; bar.style.width = '0%'; }, 400);
+
+    setStats(adsBlockedCount, scriptsBlockedCount, hiddenElements.length);
+    document.getElementById('proxy-note').style.display = 'block';
+    toast(`✓ Loaded — ${adsBlockedCount} ads removed, ${scriptsBlockedCount} scripts blocked`);
+
+  } catch(e) {
+    bar.style.display = 'none';
+    document.getElementById('empty-state').style.display = 'flex';
+    document.getElementById('empty-state').innerHTML = `
+      <div style="font-size:32px">⚠</div>
+      <h2 style="color:var(--accent2)">Load Failed</h2>
+      <p style="font-size:12px;max-width:340px;line-height:1.6">${e.message}<br><br>Try a different URL or check your connection. Some sites block proxy access.</p>
+      <button class="btn" onclick="document.getElementById('empty-state').style.display='none';loadPage()">Retry</button>
+    `;
+    toast('✕ Failed to load page', 3000);
+  }
+}
+
+// ── HTML CLEANING ──
+function cleanHTML(html, baseUrl) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // Fix base URL for relative links
+  let base = doc.querySelector('base');
+  if (!base) {
+    base = doc.createElement('base');
+    base.href = baseUrl;
+    doc.head.insertBefore(base, doc.head.firstChild);
+  }
+
+  // 1. Remove tracking/ad scripts
+  const scripts = doc.querySelectorAll('script[src]');
+  scripts.forEach(s => {
+    const src = s.src || '';
+    if (BLOCKED_SCRIPT_DOMAINS.some(d => src.includes(d))) {
+      s.remove();
+      scriptsBlockedCount++;
+    }
+  });
+
+  // 2. Remove inline ad scripts (heuristic: contains typical ad strings)
+  const inlineScripts = doc.querySelectorAll('script:not([src])');
+  inlineScripts.forEach(s => {
+    const code = s.textContent || '';
+    if (/googletag|adsbygoogle|adService|pbjs|apstag|_taboola|outbrain/i.test(code)) {
+      s.remove();
+      scriptsBlockedCount++;
+    }
+  });
+
+  // 3. Remove ad elements by selector
+  AD_SELECTORS.forEach(sel => {
+    try {
+      const els = doc.querySelectorAll(sel);
+      els.forEach(el => { el.remove(); adsBlockedCount++; });
+    } catch(e) {}
+  });
+
+  // 4. Remove iframes (almost always ads or embeds we don't need)
+  doc.querySelectorAll('iframe').forEach(f => {
+    const src = f.src || '';
+    if (BLOCKED_SCRIPT_DOMAINS.some(d => src.includes(d))) {
+      f.remove();
+      adsBlockedCount++;
+    }
+  });
+
+  // 5. Strip noscript ad tags
+  doc.querySelectorAll('noscript').forEach(n => n.remove());
+
+  // 6. Inject base stylesheet for clean reading
+  const style = doc.createElement('style');
+  style.textContent = `
+    /* CleanView injected resets */
+    [style*="position:fixed"],[style*="position: fixed"] { position: static !important; }
+    .sticky-header, header[class*="sticky"], nav[class*="sticky"] { position: sticky !important; top: 0; }
+    body { overflow: auto !important; }
+  `;
+  doc.head.appendChild(style);
+
+  return doc.documentElement.outerHTML;
+}
+
+// ── RE-APPLY HIDDEN (after reload) ──
+function reapplyHidden(doc) {
+  hiddenElements.forEach(item => {
+    try {
+      const els = doc.querySelectorAll(item.selector);
+      els.forEach(el => el.style.setProperty('display','none','important'));
+    } catch(e) {}
+  });
+}
+
+// ── CSS INJECTION ──
+function injectCSSIntoDoc(doc, css) {
+  const existing = doc.getElementById('_cleanview_css');
+  if (existing) existing.remove();
+  const s = doc.createElement('style');
+  s.id = '_cleanview_css';
+  s.textContent = css;
+  doc.head.appendChild(s);
+}
+
+function applyCSS() {
+  injectedCSS = document.getElementById('css-editor').value.trim();
+  const iframe = document.getElementById('page-iframe');
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  if (doc && injectedCSS) {
+    injectCSSIntoDoc(doc, injectedCSS);
+    toast('✓ CSS injected');
+  } else {
+    toast('Load a page first');
+  }
+}
+
+// ── PICKER MODE ──
+function togglePicker() {
+  pickerMode = !pickerMode;
+  const overlay = document.getElementById('picker-overlay');
+  const btn = document.getElementById('picker-btn');
+  overlay.classList.toggle('active', pickerMode);
+  btn.classList.toggle('active', pickerMode);
+  if (pickerMode) {
+    toast('✂ Click any element to hide it');
+    setupIframePicker();
+  } else {
+    toast('Pick mode off');
+    document.getElementById('picker-highlight').style.display = 'none';
+  }
+}
+
+// We listen inside the iframe document for hover/click
+function setupIframePicker() {
+  const iframe = document.getElementById('page-iframe');
+  if (!iframe.contentDocument) return;
+  const iDoc = iframe.contentDocument;
+
+  let lastEl = null;
+
+  const onMove = (e) => {
+    if (!pickerMode) return;
+    const el = e.target;
+    if (el === lastEl) return;
+    lastEl = el;
+    highlightElement(el, iframe);
+  };
+
+  const onClick = (e) => {
+    if (!pickerMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.target;
+    hideElement(el, iframe);
+    return false;
+  };
+
+  iDoc.addEventListener('mousemove', onMove, true);
+  iDoc.addEventListener('click', onClick, true);
+}
+
+// Highlight hovered element using the overlay div
+function highlightElement(el, iframe) {
+  const hl = document.getElementById('picker-highlight');
+  const lbl = document.getElementById('picker-label');
+  if (!el || el === iframe.contentDocument.body || el === iframe.contentDocument.documentElement) {
+    hl.style.display = 'none';
+    return;
+  }
+  const iRect = iframe.getBoundingClientRect();
+  const eRect = el.getBoundingClientRect();
+  hl.style.display = 'block';
+  hl.style.left = (iRect.left + eRect.left) + 'px';
+  hl.style.top = (iRect.top + eRect.top) + 'px';
+  hl.style.width = eRect.width + 'px';
+  hl.style.height = eRect.height + 'px';
+  lbl.style.display = 'block';
+  const tag = el.tagName.toLowerCase();
+  const id = el.id ? `#${el.id}` : '';
+  const cls = el.classList.length ? `.${[...el.classList].slice(0,2).join('.')}` : '';
+  lbl.textContent = `${tag}${id}${cls}`;
+}
+
+// fallback: overlay click (when iframe isn't loaded)
+function pickerMove(e) { /* handled inside iframe */ }
+function pickerClick(e) { /* handled inside iframe */ }
+
+// ── HIDE ELEMENT ──
+function hideElement(el, iframe) {
+  if (!el) return;
+  const tag = el.tagName.toLowerCase();
+  const id = el.id ? `#${el.id}` : '';
+  let cls = '';
+  if (el.classList.length) cls = '.' + [...el.classList].slice(0,3).join('.');
+  const selector = id ? `${tag}${id}` : (cls ? `${tag}${cls}` : tag);
+  const label = `${tag}${id}${cls}` || tag;
+
+  // Hide it now
+  el.style.setProperty('display','none','important');
+
+  // Track it
+  const item = { selector, tag, id: el.id || '', classes: [...el.classList].join(' '), label };
+  hiddenElements.push(item);
+  renderHiddenList();
+  setStats(adsBlockedCount, scriptsBlockedCount, hiddenElements.length);
+  toast(`✓ Hidden: ${label}`);
+
+  // Turn off picker
+  pickerMode = false;
+  document.getElementById('picker-overlay').classList.remove('active');
+  document.getElementById('picker-btn').classList.remove('active');
+  document.getElementById('picker-highlight').style.display = 'none';
+}
+
+// ── RENDER HIDDEN LIST ──
+function renderHiddenList() {
+  const list = document.getElementById('hidden-list');
+  const empty = document.getElementById('empty-panel');
+  document.getElementById('panel-count').textContent = hiddenElements.length;
+
+  if (hiddenElements.length === 0) {
+    list.innerHTML = '';
+    list.appendChild(emptyPanel());
+    return;
+  }
+
+  list.innerHTML = '';
+  hiddenElements.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'hidden-item';
+    div.innerHTML = `
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis">
+        <span class="tag">${item.tag}</span>${item.id ? ' <span style="color:#aaa">#'+item.id+'</span>' : ''}${item.classes ? ' <span style="opacity:.5">.'+item.classes.split(' ').slice(0,2).join('.')+'</span>' : ''}
+      </span>
+      <button class="restore-btn" onclick="restoreElement(${i})">↺ show</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function emptyPanel() {
+  const d = document.createElement('div');
+  d.id = 'empty-panel';
+  d.innerHTML = `
+    <div class="icon">⬜</div>
+    <div>No elements hidden yet.</div>
+    <div style="font-size:10px;font-family:'JetBrains Mono',monospace">Use ✂ Pick to select elements</div>
+  `;
+  return d;
+}
+
+function restoreElement(index) {
+  const item = hiddenElements[index];
+  hiddenElements.splice(index, 1);
+  // Try to re-show in iframe
+  try {
+    const iframe = document.getElementById('page-iframe');
+    const doc = iframe.contentDocument;
+    if (doc) {
+      const els = doc.querySelectorAll(item.selector);
+      els.forEach(el => el.style.removeProperty('display'));
+    }
+  } catch(e) {}
+  renderHiddenList();
+  setStats(adsBlockedCount, scriptsBlockedCount, hiddenElements.length);
+  toast(`↺ Restored: ${item.label}`);
+}
+
+function restoreAll() {
+  hiddenElements = [];
+  try {
+    const iframe = document.getElementById('page-iframe');
+    const doc = iframe.contentDocument;
+    if (doc) {
+      const allEls = doc.querySelectorAll('[style*="display"]');
+      allEls.forEach(el => el.style.removeProperty('display'));
+    }
+  } catch(e) {}
+  renderHiddenList();
+  setStats(adsBlockedCount, scriptsBlockedCount, 0);
+  toast('↺ All elements restored');
+}
+
+// ── PANEL / CSS TOGGLE ──
+function togglePanel() {
+  document.getElementById('side-panel').classList.toggle('collapsed');
+}
+
+function toggleCssPanel() {
+  document.getElementById('css-panel').classList.toggle('open');
+}
+
+// ── ENTER KEY ──
+document.getElementById('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadPage();
+});
+
+// ── INIT ──
+renderHiddenList();
+</script>
+</body>
+</html>
